@@ -15,6 +15,7 @@ const metaRoutes = require('./routes/metaRoutes');
 
 const app = express();
 
+app.set('trust proxy', 1);
 app.use(helmet());
 
 const corsOrigins = (process.env.CORS_ORIGIN || '')
@@ -24,7 +25,7 @@ const corsOrigins = (process.env.CORS_ORIGIN || '')
 
 app.use(
   cors({
-    origin: corsOrigins.length > 0 ? corsOrigins : '*',
+    origin: '*',
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   })
 );
@@ -49,13 +50,21 @@ app.use('/api/content', contentRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/meta', metaRoutes);
 
-const PORT = process.env.PORT || 4000;
+const PORT = process.env.PORT || 3000;
 
 async function ensureColumn(tableName, columnName, ddlFragment) {
-  const [cols] = await sequelize.query(`PRAGMA table_info('${tableName}');`);
-  const exists = Array.isArray(cols) && cols.some((c) => c.name === columnName);
-  if (exists) return;
-  await sequelize.query(`ALTER TABLE ${tableName} ADD COLUMN ${columnName} ${ddlFragment};`);
+  const [cols] = await sequelize.query(
+    `SELECT column_name FROM information_schema.columns WHERE table_name = '${tableName}' AND column_name = '${columnName}';`
+  );
+  if (Array.isArray(cols) && cols.length > 0) return;
+  const pgFragment = ddlFragment
+    .replace(/INTEGER NOT NULL DEFAULT/gi, 'INTEGER DEFAULT')
+    .replace(/DATETIME/gi, 'TIMESTAMP');
+  try {
+    await sequelize.query(`ALTER TABLE "${tableName}" ADD COLUMN "${columnName}" ${pgFragment};`);
+  } catch (e) {
+    if (!e.message.includes('already exists')) throw e;
+  }
 }
 
 async function ensureSchema() {
@@ -115,7 +124,7 @@ async function start() {
     await seedDefaults();
     console.log('Default departments and divisions ensured');
 
-    app.listen(PORT, () => {
+    app.listen(PORT, '0.0.0.0', () => {
       console.log(`HexaCorn backend listening on port ${PORT}`);
     });
   } catch (err) {
