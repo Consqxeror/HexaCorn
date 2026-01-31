@@ -1,11 +1,10 @@
 services:
   - type: web
-    name: hexacorn-backend
+    name: hexacorn
     runtime: node
     region: oregon
     plan: starter
-    rootDir: backend
-    buildCommand: npm install
+    buildCommand: npm run build
     startCommand: npm start
     disk:
       name: data
@@ -22,7 +21,5 @@ services:
         value: /data/uploads
       - key: DB_PATH
         value: /data/database.sqlite
-      - key: CORS_ORIGIN
-        sync: false
       - key: ADMIN_REGISTRATION_KEY
         generateValue: true
