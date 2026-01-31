@@ -53,17 +53,30 @@ app.use('/api/meta', metaRoutes);
 const PORT = process.env.PORT || 3000;
 
 async function ensureColumn(tableName, columnName, ddlFragment) {
-  const [cols] = await sequelize.query(
-    `SELECT column_name FROM information_schema.columns WHERE table_name = '${tableName}' AND column_name = '${columnName}';`
-  );
-  if (Array.isArray(cols) && cols.length > 0) return;
-  const pgFragment = ddlFragment
-    .replace(/INTEGER NOT NULL DEFAULT/gi, 'INTEGER DEFAULT')
-    .replace(/DATETIME/gi, 'TIMESTAMP');
-  try {
-    await sequelize.query(`ALTER TABLE "${tableName}" ADD COLUMN "${columnName}" ${pgFragment};`);
-  } catch (e) {
-    if (!e.message.includes('already exists')) throw e;
+  const dialect = sequelize.getDialect();
+  
+  if (dialect === 'sqlite') {
+    const [cols] = await sequelize.query(`PRAGMA table_info('${tableName}');`);
+    const exists = Array.isArray(cols) && cols.some((c) => c.name === columnName);
+    if (exists) return;
+    try {
+      await sequelize.query(`ALTER TABLE ${tableName} ADD COLUMN ${columnName} ${ddlFragment};`);
+    } catch (e) {
+      if (!e.message.includes('duplicate column')) throw e;
+    }
+  } else {
+    const [cols] = await sequelize.query(
+      `SELECT column_name FROM information_schema.columns WHERE table_name = '${tableName}' AND column_name = '${columnName}';`
+    );
+    if (Array.isArray(cols) && cols.length > 0) return;
+    const pgFragment = ddlFragment
+      .replace(/INTEGER NOT NULL DEFAULT/gi, 'INTEGER DEFAULT')
+      .replace(/DATETIME/gi, 'TIMESTAMP');
+    try {
+      await sequelize.query(`ALTER TABLE "${tableName}" ADD COLUMN "${columnName}" ${pgFragment};`);
+    } catch (e) {
+      if (!e.message.includes('already exists')) throw e;
+    }
   }
 }
 

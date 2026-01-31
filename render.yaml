@@ -1,0 +1,28 @@
+services:
+  - type: web
+    name: hexacorn-backend
+    runtime: node
+    region: oregon
+    plan: starter
+    rootDir: backend
+    buildCommand: npm install
+    startCommand: npm start
+    disk:
+      name: data
+      mountPath: /data
+      sizeGB: 1
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: JWT_SECRET
+        generateValue: true
+      - key: UPLOAD_DIR
+        value: /data/uploads
+      - key: DB_PATH
+        value: /data/database.sqlite
+      - key: CORS_ORIGIN
+        sync: false
+      - key: ADMIN_REGISTRATION_KEY
+        generateValue: true
